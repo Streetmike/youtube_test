@@ -25,11 +25,14 @@ class RankController extends Controller
         $this->youtube = new Youtube(['key' => config('youtube.key')]);
     }
 
+
+    //метод выводит индексную страницу
     public function index()
     {
         return view('youtube');
     }
 
+    //Метод обработки даных
     public function handle()
     {
         //Валидация входящих данных
@@ -46,7 +49,10 @@ class RankController extends Controller
         //Парсинг урла
         $videoId = $this->youtube->parseVIdFromURL($data['url']);
 
+        //Запрос нинформации о видео
         $video = $this->youtube->getVideoInfo($videoId);
+
+        //Запись промежуточных результатов
         $this->result['keywords'] = $data['keywords'];
         $this->result['country'] = $data['country'];
         $this->result['video'] = $video;
@@ -63,6 +69,7 @@ class RankController extends Controller
         $search = $this->youtube->searchAdvanced($params, true);
         $this->checkArray($search, $videoId);
 
+        //Цикл поверки допольнительных страниц поиска
         while ($this->result == []){
 
             //Доп параметр для проверки всех страниц поиска
@@ -70,6 +77,7 @@ class RankController extends Controller
 
             array_merge($search, $this->youtube->searchAdvanced($params, true));
 
+            //проверка на наличие данных в поиске
             if ($search['results'] == false) break;
 
             $this->checkArray($search, $videoId);
