@@ -38,7 +38,7 @@ class RankController extends Controller
         //Валидация входящих данных
         $data = $this->request->input();
         $v = \Validator::make($data, [
-            'url' => 'required',
+            'url' => 'required|regex:/^(?:https:\/\/www.youtube\.com\/)watch[?]v=(.+)$/',
             'keywords' => 'required',
         ]);
 
@@ -67,6 +67,9 @@ class RankController extends Controller
 
         //Первоначальный поиск видео
         $search = $this->youtube->searchAdvanced($params, true);
+        if ($search['results'] == false) {
+            return back()->withMsg('Not found');
+        }
         $this->checkArray($search, $videoId);
 
         //Цикл поверки допольнительных страниц поиска
