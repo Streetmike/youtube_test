@@ -8,13 +8,11 @@
 
 namespace App\Http\Controllers;
 
-use GuzzleHttp\Client;
 use Illuminate\Http\Request;
 use Madcoda\Youtube\Youtube;
 
 class RankController extends Controller
 {
-    private $client;
     private $youtube;
 
     private $result = [];
@@ -23,20 +21,13 @@ class RankController extends Controller
     {
         parent::__construct($request);
 
-        //GuzzleClient
-        $this->client = new Client();
-
         //GoogleAPIClient
         $this->youtube = new Youtube(['key' => config('youtube.key')]);
     }
 
     public function index()
     {
-        //Получение списка стран
-        $response = $this->client->request('GET', 'https://restcountries.eu/rest/v2/all');
-        $countries = json_decode((string) $response->getBody());
-
-        return view('youtube')->withCountries($countries);
+        return view('youtube');
     }
 
     public function handle()
@@ -56,8 +47,11 @@ class RankController extends Controller
         $videoId = $this->youtube->parseVIdFromURL($data['url']);
 
         $video = $this->youtube->getVideoInfo($videoId);
-        $this->result['views'] = $video->statistics->viewCount;
+        $this->result['keywords'] = $data['keywords'];
+        $this->result['country'] = $data['country'];
+        $this->result['video'] = $video;
 
+        //Параметры для запроса в Google
         $params = array(
             'q' => $data['keywords'],
             'part' => 'snippet',
@@ -65,41 +59,32 @@ class RankController extends Controller
             'regionCode' => $data['country'],
         );
 
+        //Первоначальный поиск видео
         $search = $this->youtube->searchAdvanced($params, true);
+        $this->checkArray($search, $videoId);
 
+        while ($this->result == []){
+
+            //Доп параметр для проверки всех страниц поиска
+            $params['pageToken'] = $search['info']['nextPageToken'];
+
+            array_merge($search, $this->youtube->searchAdvanced($params, true));
+
+            if ($search['results'] == false) break;
+
+            $this->checkArray($search, $videoId);
+        }
+
+        return view('youtube')->withResult($this->result);
+    }
+
+    //Метод проверяет есть ли нужное видео в массиве
+    private function checkArray($search, $videoId)
+    {
         foreach ($search['results'] as $key => $item) {
             if ($item->id->kind == 'youtube#video' && $item->id->videoId == $videoId) {
-                $this->result['video'] = $search['results'][$key];
                 $this->result['place'] = $key + 1;
             }
         }
-
-        if ($this->result == []) {
-            while ($this->result == []){
-                $params = array(
-                    'q' => $data['keywords'],
-                    'part' => 'snippet',
-                    'maxResults' => 20,
-                    'regionCode' => $data['country'],
-                    'pageToken' => $search['info']['nextPageToken']
-                );
-
-                $search = $this->youtube->searchAdvanced($params, true);
-
-                if ($search['results'] == false) break;
-
-                foreach ($search['results'] as $key => $item) {
-
-                    if ($item->id->kind == 'youtube#video' && $item->id->videoId == $videoId) {
-                        $this->result['video'] = $search['results'][$key];
-                        $this->result['place'] = $key + 1;
-                    }
-                }
-            }
-        }
-
-        dd($this->result);
     }
-
-
 }
